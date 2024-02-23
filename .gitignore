@@ -1,0 +1,5 @@
+Temp_files/
+.streamlit/
+token_fb.txt
+.vscode/
+pages/diagnostico.py
