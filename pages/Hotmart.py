@@ -1,6 +1,6 @@
 import streamlit as st
 import streamlit_authenticator as stauth
-from analise_dash import get_data_from_bucket, process_data
+from FacebookAds import get_data_from_bucket, process_data
 from io import BytesIO
 from datetime import timedelta
 import pandas as pd

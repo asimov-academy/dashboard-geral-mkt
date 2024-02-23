@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
-from FacebokAds import get_data_from_bucket
+from FacebookAds import get_data_from_bucket
 from datetime import datetime, timedelta
 from millify import millify
 import plotly.express as px

@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from millify import millify
 
-from FacebokAds import get_data_from_bucket
+from FacebookAds import get_data_from_bucket
 
 ######################## Getting the data ############################
 sheets_key = st.secrets['GOOGLE_SHEETS']
