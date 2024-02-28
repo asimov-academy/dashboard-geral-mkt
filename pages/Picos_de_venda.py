@@ -83,11 +83,11 @@ if st.session_state["authentication_status"]:
     hist_plot = px.line(g_data, x=g_data.index, y=['Faturamento', 'Investimento FB Ads'], title='Evolução diária do Faturamento/Investimento')
     st.plotly_chart(hist_plot, True)
 
-st.divider()
-late_col1, late_col2 = st.columns(2)
+    st.divider()
+    late_col1, late_col2 = st.columns(2)
 
-with late_col1:
-    st.metric(f'Melhor dia {g_data.index[g_data["Lucro"].argmax()].date()}', value=f'R${millify(g_data["Lucro"].max(), precision=1)}')
+    with late_col1:
+        st.metric(f'Melhor dia {g_data.index[g_data["Lucro"].argmax()].date()}', value=f'R${millify(g_data["Lucro"].max(), precision=1)}')
 
-with late_col2:
-    st.metric(f'Pior dia {g_data.index[g_data["Lucro"].argmin()].date()}', value=f'R${millify(g_data["Lucro"].min(), precision=1)}')
+    with late_col2:
+        st.metric(f'Pior dia {g_data.index[g_data["Lucro"].argmin()].date()}', value=f'R${millify(g_data["Lucro"].min(), precision=1)}')
