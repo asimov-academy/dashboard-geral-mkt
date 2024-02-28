@@ -313,3 +313,6 @@ with email_hist_exp:
 
         fig_hist_sessions = px.bar(data_frame=hist_email_sessions_y, y='month', x='event_name', title='Cumulativo mensal de novas sessões oriundas do email', text='event_name')
         st.plotly_chart(fig_hist_sessions, use_container_width=True)
+
+        st.subheader('Evolução')
+        

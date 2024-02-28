@@ -3,7 +3,7 @@ import streamlit as st
 from io import BytesIO
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
-from millify import millify
+import re
 import plotly.express as px
 
 from FacebookAds import get_data_from_bucket
@@ -32,19 +32,45 @@ except:
 try:
     valid_ga4 = st.session_state['valid_ga4']
 except:
-    valid_ga4 = ga4.loc[ga4['event_date'].isin(hotmart['order_date'])] 
+    valid_ga4 = ga4.loc[ga4['event_date'].isin(hotmart['order_date'])].copy()
     valid_ga4['utm_source_std'] = valid_ga4.apply(lambda x: 'Direct' if (x['utm_source_std'] == 'Others') & (x['default_channel'] == 'Direct') else x['utm_source_std'], axis=1)
-    
-    # First, filter hotmart transactions based on 'tracking.source_sck'
-    hotmart_filtered_transactions = hotmart.loc[hotmart['tracking.source_sck'].str.contains('venda'), 'transaction']
-
-    # Then, filter valid_ga4 to include only rows where 'utm_source_std' is 'Direct' and the 'transaction_id' is in the filtered hotmart transactions
-    valid_ga4_filtered = valid_ga4[(valid_ga4['utm_source_std'] == 'Direct') & (valid_ga4['transaction_id'].isin(hotmart_filtered_transactions))]
-
-    # Group valid_ga4_filtered by 'ga_session_id' and update the 'utm_source_std' column for each group
-    valid_ga4['utm_source_std'] = valid_ga4.groupby('ga_session_id')['utm_source_std'].transform(lambda x: 'Vendas' if all(x == 'Direct') else x)
     st.session_state['valid_df'] = valid_ga4
 
+def map_source(source: str) -> str:
+    source = source.lower().strip()
+    
+    # Define regular expression patterns
+    active_campaign_pattern = re.compile(r'(?:^|[^a-zA-Z0-9_])(active)(?:$|[^a-zA-Z0-9_])', re.IGNORECASE)
+    email_pattern = re.compile(r'email|e-mail|e_mail|e mail', re.IGNORECASE)
+
+    if re.search(r'\b(?:ig|fb)(?:[_]|$)', source, re.IGNORECASE) or 'facebook' in source or 'instagram' in source:
+        return 'Facebook + Instagram'
+    elif 'youtube' in source:
+        return 'YouTube'
+    elif 'bing' in source:
+        return 'Bing'
+    elif 'blog' in source:
+        return 'Blog'
+    elif 'linkedin' in source or 'lnkd.in' in source:
+        return 'Linkedin'
+    elif 'tiktok' in source:
+        return 'Tik Tok'
+    elif 'google' in source:
+        return 'Google'
+    elif 'activecampaign' in source or active_campaign_pattern.search(source) or email_pattern.search(source):
+        return 'Active Campaign'
+    elif 'direct' in source:
+        return 'Direct'
+    elif 'whatsapp' in source or re.search(r'(?:^|[^a-zA-Z0-9_])(wpp|l\.wl\.co)(?:$|[^a-zA-Z0-9_])', source, re.IGNORECASE):
+        return 'Whatsapp'
+    elif 'hub' in source:
+        return 'Hub'
+    elif 'hotmart' in source:
+        return 'HotMart'
+    elif 'yahoo' in source:
+        return 'Yahoo'
+    else:
+        return 'Others'
 
 @st.cache_data
 def get_user_journey(ga4_data: pd.DataFrame) -> pd.DataFrame:
@@ -66,6 +92,31 @@ def get_user_journey(ga4_data: pd.DataFrame) -> pd.DataFrame:
 
     user_journey.columns = ['user_inferred_id', 'utm_source_std', 'default_channel', 'utm_campaign', 'utm_content', 'transaction_id']
     return user_journey
+
+@st.cache_data
+def add_sales_team_contributions(ga4: pd.DataFrame, hotmart: pd.DataFrame):
+    '''
+    Modify the ga4 DataFrame to add the sales team contributions
+    '''
+    valid_ga4 = ga4.copy()
+    # First, filter hotmart transactions based on 'tracking.source_sck'
+    hotmart_filtered_transactions = hotmart.loc[hotmart['tracking.source_sck'].str.contains('venda'), 'transaction']
+
+    # Group valid_ga4_filtered by 'ga_session_id' and update the 'utm_source_std' column for each group
+    valid_ga4['utm_source_std'] = valid_ga4.groupby('ga_session_id', observed=True)['utm_source_std'].transform(lambda x: 'Vendas' if all(x == 'Direct') else x)
+    return valid_ga4
+
+def get_hotmart_journey(hotmart_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Extracts the UTMs parameters stored in tracking.source column in hotmart_df
+    """
+    hotmart = hotmart_df.copy()
+    #scr part
+    hotmart['utm_source_std'] = hotmart['tracking.source'].apply(lambda x: map_source(x.split('|')[1]) if x is not None and '|' in x and x.split('|')[1].isalnum() else None)
+    #sck part
+    hotmart['utm_source_std'] = hotmart.apply(lambda x: ['Vendas', x['utm_source_std']] if 'vendas' in x['tracking.source_sck'] else x['utm_source_std'], axis=1)
+    hotmart['utm_source_std'] = hotmart.apply(lambda x: ['Active Campaign',x['utm_source_std']] if 'mail' in x['tracking.source_sck'] else x['utm_source_std'], axis=1)
+    return hotmart
 
 def add_revenue_to_journey(user_journey_df: pd.DataFrame, hotmart_data: pd.DataFrame) -> pd.DataFrame:
     """
@@ -128,6 +179,10 @@ def get_revenue_by_source(user_journey_wrevenue: pd.DataFrame, sources: list) ->
                 revenue_by_source['Hub'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
             elif source == 'Vendas':
                 revenue_by_source['Vendas'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
+            elif source == 'Hotmart':
+                revenue_by_source['Hotmart'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
+            elif source == 'Yahoo':
+                revenue_by_source['Yahoo'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
             else:
                 revenue_by_source['Others'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
 
@@ -135,23 +190,21 @@ def get_revenue_by_source(user_journey_wrevenue: pd.DataFrame, sources: list) ->
 
 #######################################################################
 st.title('Vendas por canal - Visão Geral')
-st.write(valid_ga4.head())
-sources = ("Facebook + Instagram", 'Google', 'Direct', 'YouTube', 'Active Campaign','Others', 'Bing', 'Whatsapp', 'Blog', 'Tik Tok', 'Linkedin','Hub', 'Vendas')
+sources = ("Facebook + Instagram", 'Google', 'Direct', 'YouTube', 'Active Campaign','Others', 'Bing', 
+           'Whatsapp', 'Blog', 'Tik Tok', 'Linkedin','Hub', 'Vendas', 'Hotmart', 'Yahoo')
 ##################### FILTERS ##########################################
 date_range = st.sidebar.date_input("Periodo atual", value=(valid_ga4['event_date'].max() - timedelta(days=6), valid_ga4['event_date'].max()), max_value=valid_ga4['event_date'].max(), min_value=valid_ga4['event_date'].min(), key='vendas_por_canal_dates')
-dates_range_benchmark = st.date_input("Periodo de para comparação", value=(valid_ga4['event_date'].max()-timedelta(days=13), valid_ga4['event_date'].max()-timedelta(days=7)), max_value=valid_ga4['event_date'].max(), min_value=valid_ga4['event_date'].min(), key='vendas_por_canal_dates_benchmark')
 limited_ga4 = valid_ga4.loc[(valid_ga4['event_date'].dt.date >= date_range[0]) & (valid_ga4['event_date'].dt.date <= date_range[1])]
-limited_benchmark = valid_ga4.loc[(valid_ga4['event_date'].dt.date >= dates_range_benchmark[0]) & (valid_ga4['event_date'].dt.date <= dates_range_benchmark[1])]
-
 limited_hotmart = hotmart.loc[(hotmart['order_date'] >= date_range[0]) & 
                                 (hotmart['order_date'] <= date_range[1]) & 
                                 (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
 
-benchmark = hotmart.loc[(hotmart['order_date'] >= dates_range_benchmark[0]) & 
-                        (hotmart['order_date'] <= dates_range_benchmark[1]) & 
-                        (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
+limited_hotmart = get_hotmart_journey(limited_hotmart)
+
+st.write(limited_hotmart)
 
 ################################## BEGIN  #################################
+limited_ga4 = add_sales_team_contributions(ga4=limited_ga4, hotmart=limited_hotmart)
 user_journey = get_user_journey(limited_ga4)
 user_journey_wrevenue = add_revenue_to_journey(user_journey_df=user_journey, hotmart_data=limited_hotmart)
 revenue_by_source = get_revenue_by_source(user_journey_wrevenue=user_journey_wrevenue, sources=sources)
@@ -167,13 +220,8 @@ with col_1:
                                                 gauge={'shape': 'bullet'}
                                                 ))
         st.plotly_chart(target_fig, use_container_width=True)
-        st.write(f'target {target} - total {revenue_by_source["revenue"].sum()}')
+
 with col_2:
     sources_fig = px.pie(data_frame=revenue_by_source, names='source', values='revenue', title='Distribuição do faturamento')
     st.plotly_chart(sources_fig, use_container_width=True)
     
-    
-    st.write(limited_ga4.loc[(limited_ga4['utm_source_std'] == 'Direct')
-                  & (limited_ga4['transaction_id'].isin(
-                                                        hotmart.loc[hotmart['tracking.source_sck'].str.contains('venda'), 'transaction']
-                                                     ))].groupby(by='ga_session_id', observed=True).agg(list))
