@@ -88,10 +88,11 @@ def get_user_journey(ga4_data: pd.DataFrame) -> pd.DataFrame:
         'default_channel': lambda x: list(x.unique()),
         'utm_campaign': lambda x: list(x.unique()),
         'utm_content': lambda x: list(x.unique()),
-        'transaction_id': lambda x: list(x.unique())
+        'transaction_id': lambda x: list(x.unique()),
+        'event_date': lambda x: x.min()
     }).reset_index()
 
-    user_journey.columns = ['user_inferred_id', 'utm_source_std', 'default_channel', 'utm_campaign', 'utm_content', 'transaction_id']
+    user_journey.columns = ['user_inferred_id', 'utm_source_std', 'default_channel', 'utm_campaign', 'utm_content', 'transaction_id', 'start_date']
     return user_journey
 
 @st.cache_data
@@ -103,10 +104,14 @@ def add_sales_team_contributions(ga4: pd.DataFrame, hotmart: pd.DataFrame):
     hotmart_filtered_transactions = hotmart.loc[hotmart['tracking.source_sck'].str.contains('venda'), 'transaction']
     ga4_session = ga4.loc[ga4['transaction_id'].isin(hotmart_filtered_transactions), 'ga_session_id']
     valid_ga4 = ga4.loc[ga4['ga_session_id'].isin(ga4_session)].copy()
-    valid_ga4['utm_source_std'] = valid_ga4.groupby('ga_session_id', observed=True)['utm_source_std'].transform(lambda x: 'Vendas' if all(x == 'Direct') else x)
-    ga.loc[ga.index.isin(valid_ga4.index), 'utm_source_std'] = valid_ga4['utm_source_std']
+    valid_ga4['utm_source_std'] = valid_ga4.groupby('ga_session_id', observed=True)['utm_source_std'].transform(lambda x: 'Vendas' if any(x == 'Direct') else x)
+    
+    # Use boolean indexing to update the correct rows in ga
+    ga.loc[ga['ga_session_id'].isin(valid_ga4['ga_session_id']), 'utm_source_std'] = valid_ga4['utm_source_std'].values
+    
     return ga
 
+@st.cache_data
 def get_hotmart_journey(hotmart_df: pd.DataFrame) -> pd.DataFrame:
     """
     Extracts the UTMs parameters stored in tracking.source column in hotmart_df
@@ -119,6 +124,7 @@ def get_hotmart_journey(hotmart_df: pd.DataFrame) -> pd.DataFrame:
     hotmart['utm_source_std'] = hotmart.apply(lambda x: ['Active Campaign',x['utm_source_std']] if 'mail' in x['tracking.source_sck'] else x['utm_source_std'], axis=1)
     return hotmart
 
+@st.cache_data
 def merge_journeys(journey_ga4: pd.DataFrame, journey_hotmart: pd.DataFrame) -> pd.DataFrame:
     """
     Merges the DataFrames containing the user journey from GA4 and Hotmart info
@@ -144,6 +150,7 @@ def merge_journeys(journey_ga4: pd.DataFrame, journey_hotmart: pd.DataFrame) -> 
     merged_grouped['utm_source_std'] = merged_grouped['utm_source_std'].apply(lambda x: list(set(x)))
     return merged_grouped
 
+@st.cache_data
 def add_revenue_to_journey(merged_journeys_df: pd.DataFrame, hotmart_data: pd.DataFrame) -> pd.DataFrame:
     """
     Adds to the DataFrame user_journey the revenue associated with each user.
@@ -156,6 +163,7 @@ def add_revenue_to_journey(merged_journeys_df: pd.DataFrame, hotmart_data: pd.Da
     user_journey_with_revenue['commission.value'] = user_journey_with_revenue['commission.value'].fillna(0)
     return user_journey_with_revenue
 
+@st.cache_data
 def get_revenue_by_source(user_journey_with_revenue: pd.DataFrame) -> pd.DataFrame:
     """
     Returns the revenue by source
@@ -167,6 +175,7 @@ def get_revenue_by_source(user_journey_with_revenue: pd.DataFrame) -> pd.DataFra
     revenue_by_source = revenue_by_source.rename(columns={'commission.value':'revenue'})
     return revenue_by_source
 
+@st.cache_data
 def sanitize_journeys(final_user_journey: pd.DataFrame) -> pd.DataFrame:
     """
     Looks in final_user_journey for journey where Direct isn't the only source in utm_source_std
@@ -204,9 +213,10 @@ if st.session_state["authentication_status"]:
                                     (hotmart['approved_date'].dt.date <= date_range[1]) & 
                                     (hotmart['status'].isin(['APPROVED','COMPLETE']))] #desprezando compras canceladas
 
-    limited_hotmart = get_hotmart_journey(limited_hotmart)
+ 
 
     ################################## BEGIN  #################################
+    limited_hotmart = get_hotmart_journey(limited_hotmart)
     limited_ga4 = add_sales_team_contributions(ga4=limited_ga4, hotmart=limited_hotmart)
     user_journey = get_user_journey(limited_ga4)
     merged_journey = merge_journeys(journey_ga4=user_journey, journey_hotmart=limited_hotmart) #Existem transações fantasma no GA4 com id parecido com Hotmart
