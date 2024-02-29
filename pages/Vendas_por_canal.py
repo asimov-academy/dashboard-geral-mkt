@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 from io import BytesIO
+import streamlit_authenticator as stauth
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import re
@@ -98,13 +99,13 @@ def add_sales_team_contributions(ga4: pd.DataFrame, hotmart: pd.DataFrame):
     '''
     Modify the ga4 DataFrame to add the sales team contributions
     '''
-    valid_ga4 = ga4.copy()
-    # First, filter hotmart transactions based on 'tracking.source_sck'
+    ga = ga4.copy()
     hotmart_filtered_transactions = hotmart.loc[hotmart['tracking.source_sck'].str.contains('venda'), 'transaction']
-
-    # Group valid_ga4_filtered by 'ga_session_id' and update the 'utm_source_std' column for each group
+    ga4_session = ga4.loc[ga4['transaction_id'].isin(hotmart_filtered_transactions), 'ga_session_id']
+    valid_ga4 = ga4.loc[ga4['ga_session_id'].isin(ga4_session)].copy()
     valid_ga4['utm_source_std'] = valid_ga4.groupby('ga_session_id', observed=True)['utm_source_std'].transform(lambda x: 'Vendas' if all(x == 'Direct') else x)
-    return valid_ga4
+    ga.loc[ga.index.isin(valid_ga4.index), 'utm_source_std'] = valid_ga4['utm_source_std']
+    return ga
 
 def get_hotmart_journey(hotmart_df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -118,110 +119,113 @@ def get_hotmart_journey(hotmart_df: pd.DataFrame) -> pd.DataFrame:
     hotmart['utm_source_std'] = hotmart.apply(lambda x: ['Active Campaign',x['utm_source_std']] if 'mail' in x['tracking.source_sck'] else x['utm_source_std'], axis=1)
     return hotmart
 
-def add_revenue_to_journey(user_journey_df: pd.DataFrame, hotmart_data: pd.DataFrame) -> pd.DataFrame:
+def merge_journeys(journey_ga4: pd.DataFrame, journey_hotmart: pd.DataFrame) -> pd.DataFrame:
     """
-    Adds to the dataframe user_journey the revenue associated with each user
+    Merges the DataFrames containing the user journey from GA4 and Hotmart info
     """
-    # Make a copy of user_journey_df to avoid modifying the original DataFrame
-    user_journey_with_revenue = user_journey_df.copy()
+    # Filter Hotmart DataFrame by approved or complete transactions
+    hotmart_filtered = journey_hotmart[journey_hotmart['status'].isin(['APPROVED', 'COMPLETE'])][['transaction', 'utm_source_std']]
     
-    # Filter hotmart_data to include only approved and complete transactions from producer source
+    # Merge DataFrames using transaction IDs
+    merged = pd.merge(journey_ga4.explode('transaction_id'), hotmart_filtered.explode('transaction'), left_on='transaction_id', right_on='transaction', suffixes=('_ga4', '_hotmart'), how='right')
+    
+    # Convert non-list values in 'utm_source_std' columns to lists and remove None values
+    merged['utm_source_std_ga4'] = merged['utm_source_std_ga4'].apply(lambda x: [item for item in x if item is not None] if isinstance(x, list) else [])
+    merged['utm_source_std_hotmart'] = merged['utm_source_std_hotmart'].apply(lambda x: [item for item in x if item is not None] if isinstance(x, list) else [])
+    
+    # Concatenate utm_source_std lists
+    merged['utm_source_std'] = merged['utm_source_std_ga4'] + merged['utm_source_std_hotmart']
+
+    for index, row in merged.iterrows():
+        if len(row['utm_source_std']) == 0:
+            merged.at[index, 'utm_source_std'] = ['Desconhecido']
+    # Group by transaction and aggregate utm_source_final lists
+    merged_grouped = merged.groupby('transaction').agg({'utm_source_std': 'sum'}).reset_index()
+    merged_grouped['utm_source_std'] = merged_grouped['utm_source_std'].apply(lambda x: list(set(x)))
+    return merged_grouped
+
+def add_revenue_to_journey(merged_journeys_df: pd.DataFrame, hotmart_data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds to the DataFrame user_journey the revenue associated with each user.
+    """
+
+    user_journey = merged_journeys_df.copy()
     valid_transactions = hotmart_data[(hotmart_data['status'].isin(['APPROVED', 'COMPLETE'])) & (hotmart_data['source'] == 'PRODUCER')]
-    
-    # Group hotmart_data by transaction and calculate the total commission value for each transaction
     transaction_revenue = valid_transactions.groupby('transaction')['commission.value'].sum().reset_index()
-    
-    # Explode the 'transaction' column to create separate rows for each transaction
-    user_journey_exploded = user_journey_with_revenue.explode('transaction_id')
-    
-    # Merge user_journey_exploded with transaction_revenue based on transaction ID
-    user_journey_with_revenue = pd.merge(user_journey_exploded, transaction_revenue, left_on='transaction_id', right_on='transaction', how='left')
-    
-    # Calculate revenue per user by dividing total commission value by the number of users in the journey
-    user_journey_with_revenue['total_revenue'] = user_journey_with_revenue['commission.value'] / user_journey_with_revenue.groupby('transaction_id')['user_inferred_id'].transform('count')
-    
-    # Drop unnecessary columns
-    user_journey_with_revenue.drop(['commission.value'], axis=1, inplace=True)
-    
+    user_journey_with_revenue = pd.merge(user_journey, transaction_revenue, left_on='transaction', right_on='transaction', how='left')
+    user_journey_with_revenue['commission.value'] = user_journey_with_revenue['commission.value'].fillna(0)
     return user_journey_with_revenue
 
-def get_revenue_by_source(user_journey_wrevenue: pd.DataFrame, sources: list) -> dict:
+def get_revenue_by_source(user_journey_with_revenue: pd.DataFrame) -> pd.DataFrame:
     """
-    Returns the total revenue by source in user_jorney_wrevenue. Sales with more than one source will have their value equally divided
+    Returns the revenue by source
     """
-    revenue_by_source = dict.fromkeys(sources, 0)  # Initialize the dictionary with default value 0
+    # Divide revenue equally among sources
+    user_journey_with_revenue['revenue_per_source'] = user_journey_with_revenue['commission.value'] / user_journey_with_revenue['utm_source_std'].apply(len)
+    # Calculate revenue by source
+    revenue_by_source = user_journey_with_revenue.explode('utm_source_std').groupby('utm_source_std')['revenue_per_source'].sum().reset_index()
+    revenue_by_source = revenue_by_source.rename(columns={'commission.value':'revenue'})
+    return revenue_by_source
 
-    for user in user_journey_wrevenue['user_inferred_id'].unique():
-        user_sources = list(user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'utm_source_std'].values)
-        for source in user_sources:
-            source = ''.join(source) #flatten the f** list
-            if source == 'Facebook + Instagram':
-                revenue_by_source['Facebook + Instagram'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'Google':
-                revenue_by_source['Google'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'Direct':
-                revenue_by_source['Direct'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'YouTube':
-                revenue_by_source['YouTube'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'Active Campaign':
-                revenue_by_source['Active Campaign'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)               
-            elif source == 'Bing':
-                revenue_by_source['Bing'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'Whatsapp':
-                revenue_by_source['Whatsapp'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'Blog':
-                revenue_by_source['Blog'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'Tik Tok':
-                revenue_by_source['Tik Tok'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'LinkedIn':
-                revenue_by_source['LinkedIn'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'Hub':
-                revenue_by_source['Hub'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'Vendas':
-                revenue_by_source['Vendas'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'Hotmart':
-                revenue_by_source['Hotmart'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            elif source == 'Yahoo':
-                revenue_by_source['Yahoo'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
-            else:
-                revenue_by_source['Others'] += user_journey_wrevenue.loc[user_journey_wrevenue['user_inferred_id'] == user, 'total_revenue'].sum() / len(user_sources)
+def sanitize_journeys(final_user_journey: pd.DataFrame) -> pd.DataFrame:
+    """
+    Looks in final_user_journey for journey where Direct isn't the only source in utm_source_std
+    and removes it from there. Why am I doing it? If the user has multiple sources and one of them is direct it problably means
+    that he came from another source ad save the link for later, or at least he was exposed to the site before
+    """
+    multi_source_journeys = final_user_journey[final_user_journey['utm_source_std'].apply(lambda x: len(x) > 1 and 'Direct' in x)]
 
-    return pd.DataFrame(revenue_by_source.items(), columns=['source', 'revenue'])
+    # Remove Direct from those journeys
+    multi_source_journeys['utm_source_std'] = multi_source_journeys['utm_source_std'].apply(lambda x: [source for source in x if source != 'Direct'])
+
+    # Update the final_user_journey DataFrame
+    final_user_journey.loc[multi_source_journeys.index, 'utm_source_std'] = multi_source_journeys['utm_source_std']
+
+    return final_user_journey
 
 #######################################################################
-st.title('Vendas por canal - Visão Geral')
-sources = ("Facebook + Instagram", 'Google', 'Direct', 'YouTube', 'Active Campaign','Others', 'Bing', 
-           'Whatsapp', 'Blog', 'Tik Tok', 'Linkedin','Hub', 'Vendas', 'Hotmart', 'Yahoo')
-##################### FILTERS ##########################################
-date_range = st.sidebar.date_input("Periodo atual", value=(valid_ga4['event_date'].max() - timedelta(days=6), valid_ga4['event_date'].max()), max_value=valid_ga4['event_date'].max(), min_value=valid_ga4['event_date'].min(), key='vendas_por_canal_dates')
-limited_ga4 = valid_ga4.loc[(valid_ga4['event_date'].dt.date >= date_range[0]) & (valid_ga4['event_date'].dt.date <= date_range[1])]
-limited_hotmart = hotmart.loc[(hotmart['order_date'] >= date_range[0]) & 
-                                (hotmart['order_date'] <= date_range[1]) & 
-                                (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
+authenticator = stauth.Authenticate(
+    dict(st.secrets['credentials']),
+    st.secrets['cookie']['name'],
+    st.secrets['cookie']['key'],
+    st.secrets['cookie']['expiry_days'],
+    st.secrets['preauthorized']
+)
 
-limited_hotmart = get_hotmart_journey(limited_hotmart)
+name, authentication_status, username = authenticator.login('Login', 'main')
+if st.session_state["authentication_status"]:
+    authenticator.logout('Logout', 'sidebar')
+    st.title('Vendas por canal - Visão Geral')
 
-st.write(limited_hotmart)
+    ##################### FILTERS ##########################################
+    date_range = st.sidebar.date_input("Periodo atual", value=(valid_ga4['event_date'].max() - timedelta(days=6), valid_ga4['event_date'].max()), max_value=valid_ga4['event_date'].max(), min_value=valid_ga4['event_date'].min(), key='vendas_por_canal_dates')
+    limited_ga4 = valid_ga4.loc[(valid_ga4['event_date'].dt.date >= date_range[0]) & (valid_ga4['event_date'].dt.date <= date_range[1])]
+    limited_hotmart = hotmart.loc[(hotmart['approved_date'].dt.date >= date_range[0]) & 
+                                    (hotmart['approved_date'].dt.date <= date_range[1]) & 
+                                    (hotmart['status'].isin(['APPROVED','COMPLETE']))] #desprezando compras canceladas
 
-################################## BEGIN  #################################
-limited_ga4 = add_sales_team_contributions(ga4=limited_ga4, hotmart=limited_hotmart)
-user_journey = get_user_journey(limited_ga4)
-user_journey_wrevenue = add_revenue_to_journey(user_journey_df=user_journey, hotmart_data=limited_hotmart)
-revenue_by_source = get_revenue_by_source(user_journey_wrevenue=user_journey_wrevenue, sources=sources)
+    limited_hotmart = get_hotmart_journey(limited_hotmart)
 
-col_1, col_2 = st.columns(2)
-with col_1:     
-        st.subheader('Faturamento Indentificado')
-        target = limited_hotmart.loc[(limited_hotmart['status'].isin(['APPROVED','COMPLETE']))
-                                     & (limited_hotmart['source'] == 'PRODUCER'), 'commission.value'].sum()
-        target_fig = go.Figure()
-        target_fig.add_trace(trace=go.Indicator(mode = "gauge+number+delta", value = revenue_by_source['revenue'].sum(),
-                                                title = {'text': "Faturamento Identificado"}, delta={'reference':target},
-                                                gauge={'shape': 'bullet'}
-                                                ))
-        st.plotly_chart(target_fig, use_container_width=True)
+    ################################## BEGIN  #################################
+    limited_ga4 = add_sales_team_contributions(ga4=limited_ga4, hotmart=limited_hotmart)
+    user_journey = get_user_journey(limited_ga4)
+    merged_journey = merge_journeys(journey_ga4=user_journey, journey_hotmart=limited_hotmart) #Existem transações fantasma no GA4 com id parecido com Hotmart
+    final_journey = add_revenue_to_journey(merged_journeys_df=merged_journey, hotmart_data=limited_hotmart)
+    final_journey = sanitize_journeys(final_user_journey=final_journey)
+    revenue_by_source = get_revenue_by_source(user_journey_with_revenue=final_journey)
 
-with col_2:
-    sources_fig = px.pie(data_frame=revenue_by_source, names='source', values='revenue', title='Distribuição do faturamento')
-    st.plotly_chart(sources_fig, use_container_width=True)
-    
+    col_1, col_2 = st.columns(2)
+    with col_1:     
+            st.subheader('% Faturamento Indentificado')
+            target = limited_hotmart.loc[(limited_hotmart['status'].isin(['APPROVED','COMPLETE']))
+                                        & (limited_hotmart['source'] == 'PRODUCER'), 'commission.value'].sum()
+            target_fig = go.Figure()
+            target_fig.add_trace(trace=go.Indicator(mode = "gauge+number+delta", value = round(target/revenue_by_source['revenue_per_source'].sum() * 100,0),
+                                                    title = {'text': "Faturamento Identificado"}, delta={'reference':100},
+                                                    gauge={'shape': 'bullet'}
+                                                    ))
+            st.plotly_chart(target_fig, use_container_width=True)
+
+    with col_2:
+        sources_fig = px.pie(data_frame=revenue_by_source, names='utm_source_std', values='revenue_per_source', title='Distribuição do faturamento')
+        st.plotly_chart(sources_fig, use_container_width=True)
