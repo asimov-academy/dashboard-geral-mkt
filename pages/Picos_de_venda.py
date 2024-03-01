@@ -80,7 +80,7 @@ if st.session_state["authentication_status"]:
     with col_4:
         st.metric(label='ROAS', value=round(g_data['Lucro'].sum() / g_data['Investimento FB Ads'].sum(), 2))
 
-    hist_plot = px.line(g_data, x=g_data.index, y=['Faturamento', 'Investimento FB Ads'], title='Evolução diária do Faturamento/Investimento')
+    hist_plot = px.line(g_data, x=g_data.index, y=['Faturamento', 'Investimento FB Ads','Lucro'], title='Evolução diária do Faturamento/Investimento')
     st.plotly_chart(hist_plot, True)
 
     st.divider()
@@ -91,3 +91,11 @@ if st.session_state["authentication_status"]:
 
     with late_col2:
         st.metric(f'Pior dia {g_data.index[g_data["Faturamento"].argmin()].date()}', value=f'R${millify(g_data["Faturamento"].min(), precision=1)}')
+
+    
+    tmp = limited_hotmart.loc[(limited_hotmart['status'].isin(['COMPLETE','APPROVED'])) & (limited_hotmart['source'] == 'PRODUCER')].copy()
+    tmp.loc[tmp['tracking.source_sck'].str.contains('mail'), 'tracking.source_sck'] = 'e-mail'
+    tmp.loc[tmp['tracking.source_sck'].str.contains('venda'), 'tracking.source_sck'] = 'vendas'
+    sck_figure = px.pie(data_frame=tmp, values='count', names= 'tracking.source_sck', hole=0.5, 
+                        title='Distribuição das vendas por sck', height=600).update_traces(textinfo='percent+value')
+    st.plotly_chart(sck_figure, use_container_width=True)
