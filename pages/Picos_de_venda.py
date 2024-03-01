@@ -96,6 +96,8 @@ if st.session_state["authentication_status"]:
     tmp = limited_hotmart.loc[(limited_hotmart['status'].isin(['COMPLETE','APPROVED'])) & (limited_hotmart['source'] == 'PRODUCER')].copy()
     tmp.loc[tmp['tracking.source_sck'].str.contains('mail'), 'tracking.source_sck'] = 'e-mail'
     tmp.loc[tmp['tracking.source_sck'].str.contains('venda'), 'tracking.source_sck'] = 'vendas'
+    tmp.loc[tmp['tracking.source_sck'].str.contains('home'), 'tracking.source_sck'] = 'home'
+    
     sck_figure = px.pie(data_frame=tmp, values='count', names= 'tracking.source_sck', hole=0.5, 
                         title='Distribuição das vendas por sck', height=600).update_traces(textinfo='percent+value')
     st.plotly_chart(sck_figure, use_container_width=True)
