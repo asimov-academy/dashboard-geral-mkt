@@ -7,7 +7,8 @@ import pandas as pd
 from millify import millify
 import streamlit_authenticator as stauth
 import plotly.express as px
-
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 try:
     fb = st.session_state['fb']
@@ -94,10 +95,36 @@ if st.session_state["authentication_status"]:
 
     
     tmp = limited_hotmart.loc[(limited_hotmart['status'].isin(['COMPLETE','APPROVED'])) & (limited_hotmart['source'] == 'PRODUCER')].copy()
-    tmp.loc[tmp['tracking.source_sck'].str.contains('mail'), 'tracking.source_sck'] = 'e-mail'
-    tmp.loc[tmp['tracking.source_sck'].str.contains('venda'), 'tracking.source_sck'] = 'vendas'
+    tmp.loc[(tmp['tracking.source_sck'].str.contains('mail'))
+             & ((tmp['tracking.source_sck'].str.contains('upgrade'))), 'tracking.source_sck'] = 'e-mail upgrade'
+    tmp.loc[(tmp['tracking.source_sck'].str.contains('mail'))&(~(tmp['tracking.source_sck'].str.contains('upgrade'))), 'tracking.source_sck'] = 'e-mail'
+    tmp.loc[(tmp['tracking.source_sck'].str.contains('venda'))
+            & (tmp['tracking.source_sck'].str.contains('upgrade')), 'tracking.source_sck'] = 'vendas upgrade'
+    tmp.loc[(tmp['tracking.source_sck'].str.contains('venda'))
+            & (~tmp['tracking.source_sck'].str.contains('upgrade')), 'tracking.source_sck'] = 'vendas'
     tmp.loc[tmp['tracking.source_sck'].str.contains('home'), 'tracking.source_sck'] = 'home'
+    tmp.loc[tmp['tracking.source_sck'].str.contains('popup'), 'tracking.source_sck'] = 'pop'
     
-    sck_figure = px.pie(data_frame=tmp, values='count', names= 'tracking.source_sck', hole=0.5, 
-                        title='Distribuição das vendas por sck', height=600).update_traces(textinfo='percent+value')
-    st.plotly_chart(sck_figure, use_container_width=True)
+
+    # Get unique sck values
+    sck_values = tmp['tracking.source_sck'].unique()
+    fig = make_subplots(rows=1, cols=2, column_titles=['Distribuição das vendas', 'Distribuição do faturamento'],
+                        shared_yaxes=True, specs=[[{"type": "pie"}, {"type": "pie"}]])
+    # Define a color map based on sck values
+    color_map = {sck: px.colors.qualitative.Light24[i % len(px.colors.qualitative.Set1)] for i, sck in enumerate(sck_values)}
+
+    # Create the first pie chart
+    trace1 = go.Pie(values=tmp['count'], labels=tmp['tracking.source_sck'],domain=dict(x=[0, 0.5]), hole=0.4)
+    colors1 = [color_map.get(sck, '#1f77b4') for sck in tmp['tracking.source_sck']]
+    trace2 = go.Pie(values=tmp['commission.value'], labels=tmp['tracking.source_sck'],domain=dict(x=[0.51, 1.0]), hole=0.4)
+
+    # Set colors using color_map
+    colors2 = [color_map.get(sck, '#1f77b4') for sck in tmp['tracking.source_sck']]
+    trace2.marker.colors = colors1
+    trace1.marker.colors = colors1
+    
+    fig.add_traces([trace1, trace2])
+    fig.update_layout(height=600, showlegend=True)
+  
+    st.plotly_chart(fig, use_container_width=True)
+
