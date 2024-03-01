@@ -111,7 +111,7 @@ if st.session_state["authentication_status"]:
     fig = make_subplots(rows=1, cols=2, column_titles=['Distribuição das vendas', 'Distribuição do faturamento'],
                         shared_yaxes=True, specs=[[{"type": "pie"}, {"type": "pie"}]])
     # Define a color map based on sck values
-    color_map = {sck: px.colors.qualitative.Light24[i % len(px.colors.qualitative.Set1)] for i, sck in enumerate(sck_values)}
+    color_map = {sck: px.colors.qualitative.Light24[i % len(px.colors.qualitative.Light24)] for i, sck in enumerate(sck_values)}
 
     # Create the first pie chart
     trace1 = go.Pie(values=tmp['count'], labels=tmp['tracking.source_sck'],domain=dict(x=[0, 0.5]), hole=0.4)
