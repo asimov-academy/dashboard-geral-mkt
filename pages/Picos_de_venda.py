@@ -103,7 +103,7 @@ if st.session_state["authentication_status"]:
     tmp.loc[(tmp['tracking.source_sck'].str.contains('venda'))
             & (~tmp['tracking.source_sck'].str.contains('upgrade')), 'tracking.source_sck'] = 'vendas'
     tmp.loc[tmp['tracking.source_sck'].str.contains('home'), 'tracking.source_sck'] = 'home'
-    tmp.loc[tmp['tracking.source_sck'].str.contains('popup'), 'tracking.source_sck'] = 'pop'
+    tmp.loc[tmp['tracking.source_sck'].str.contains('popup'), 'tracking.source_sck'] = 'popup'
     
 
     # Get unique sck values
