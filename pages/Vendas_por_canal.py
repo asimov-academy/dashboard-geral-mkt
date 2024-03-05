@@ -36,23 +36,29 @@ def get_revenue_by_source(user_journey_with_revenue: pd.DataFrame) -> pd.DataFra
     """
     Adds revenue by source to the DataFrame.
     """
-    # Make a copy of the DataFrame to avoid modifying the original
     user_journey = user_journey_with_revenue.copy()
     user_journey['revenue_per_source'] = user_journey['commission.value'] / user_journey['utm_source_std'].apply(len)
-    # Initialize dictionary to store revenue by source
+
     revenue_by_source = {}
 
-    # Iterate over each row in the DataFrame
     for idx, row in user_journey.iterrows():
-        # Iterate over sources in the utm_source_std list
         for source in row['utm_source_std']:
-            # Update revenue for each unique source
             revenue_by_source.setdefault(source, 0)
             revenue_by_source[source] += row['revenue_per_source']
 
-    # Convert dictionary to DataFrame
     revenue_df = pd.DataFrame(list(revenue_by_source.items()), columns=['utm_source_std', 'total_revenue'])
     revenue_df['total_revenue'] = revenue_df['total_revenue'].apply(lambda x: float(x[0]))
+    return revenue_df
+
+def get_revenue_by_source_daily(user_journey_with_revenue: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adds revenue by source to the DataFrame.
+    """
+    user_journey = user_journey_with_revenue.copy()
+    user_journey['revenue_per_source'] = user_journey['commission.value'] / user_journey['utm_source_std'].apply(len)
+    
+    revenue_df = user_journey.explode('utm_source_std').groupby(['approved_date', 'utm_source_std'])['revenue_per_source'].sum().reset_index()
+    revenue_df['revenue_per_source'] = revenue_df['revenue_per_source'].astype(float)
     return revenue_df
 
 
@@ -83,7 +89,7 @@ if st.session_state["authentication_status"]:
     limited_hotmart = valid_hotmart.loc[(valid_hotmart['approved_date'].dt.date >= date_range[0]) & (valid_hotmart['approved_date'].dt.date <= date_range[1])]
     
 
-    revenue_by_source = get_revenue_by_source(user_journey_with_revenue=limited_sales)   
+    revenue_by_source = get_revenue_by_source(user_journey_with_revenue=limited_sales) 
     target = limited_hotmart.loc[(limited_hotmart['source'] == 'PRODUCER'), 'commission.value'].sum()
 
     col_1, col_2 = st.columns(2)
@@ -102,3 +108,18 @@ if st.session_state["authentication_status"]:
     with col_2:
         sources_fig = px.pie(data_frame=revenue_by_source, names='utm_source_std', values='total_revenue', title='Distribuição do faturamento')
         st.plotly_chart(sources_fig, use_container_width=True)
+
+    hist_exp = st.expander('Evolução histórica')
+    with hist_exp:
+        option = st.radio(label='Usar datas diferentes do período selecionado', options=['Sim', 'Não'], index=1)
+        if option == 'Não':
+            daily_revenue_by_source = get_revenue_by_source_daily(user_journey_with_revenue=limited_sales)
+            fig = px.line(data_frame=daily_revenue_by_source, x='approved_date', y='revenue_per_source', color='utm_source_std', title='Evolução do faturamento ao longo do tempo')
+        
+        else:
+            new_dates = st.date_input("Selecione o periodo desejado", value=(sales_journeys['approved_date'].min(), sales_journeys['approved_date'].max()), max_value=sales_journeys['approved_date'].max(), min_value=sales_journeys['approved_date'].min())
+            tmp = sales_journeys.loc[(sales_journeys['approved_date'].dt.date >= new_dates[0]) & (sales_journeys['approved_date'].dt.date <= new_dates[1])]   
+            daily_revenue_by_source = get_revenue_by_source_daily(tmp)            
+            fig = px.line(data_frame=daily_revenue_by_source, x='approved_date', y='revenue_per_source', color='utm_source_std', title='Evolução do faturamento ao longo do tempo')
+    
+        st.plotly_chart(fig, use_container_width= True)
