@@ -132,6 +132,7 @@ except:
     raw_hotmart['count'] = 1
     raw_hotmart['tracking.source_sck'] = raw_hotmart['tracking.source_sck'].fillna(value='Desconhecido')
     raw_hotmart['approved_date'] = pd.to_datetime(raw_hotmart['approved_date'])
+    raw_hotmart['order_date'] = pd.to_datetime(raw_hotmart['order_date'])
     st.session_state['hotmart_data'] = raw_hotmart
     hotmart = st.session_state['hotmart_data'] = raw_hotmart
 
@@ -162,12 +163,12 @@ limited_ga4_benchmark = ga4.loc[(ga4['event_date'].dt.date >= dates_benchmark_ac
 if ((len(limited_ga4) == 0) | (len(limited_active_benchmark) == 0)):
      st.warning(f'"🚨" dados do GA4 indisponíveis para o periodo selecionado período disponível {ga4["event_date"].max()} - {ga4["event_date"].min()}')
 
-limited_hotmart = hotmart.loc[(hotmart['approved_date'].dt.date >= date_range[0]) & 
-                                (hotmart['approved_date'].dt.date <= date_range[1]) & 
+limited_hotmart = hotmart.loc[(hotmart['order_date'].dt.date >= date_range[0]) & 
+                                (hotmart['order_date'].dt.date <= date_range[1]) & 
                                 (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
 
-limited_hotmart_benchmark = hotmart.loc[(hotmart['approved_date'].dt.date >= dates_benchmark_active[0]) & 
-                        (hotmart['approved_date'].dt.date <= dates_benchmark_active[1]) & 
+limited_hotmart_benchmark = hotmart.loc[(hotmart['order_date'].dt.date >= dates_benchmark_active[0]) & 
+                        (hotmart['order_date'].dt.date <= dates_benchmark_active[1]) & 
                         (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
 if ((len(limited_hotmart) == 0) | (len(limited_hotmart_benchmark) == 0)):
      st.warning(f'"🚨" dados da Hotmart indisponíveis para o periodo selecionado período disponível {hotmart["order_date"].max()} - {hotmart["order_date"].min()}')
@@ -283,6 +284,7 @@ with email_hist_exp:
         st.plotly_chart(fig_hist_sessions, use_container_width=True)
 
     with hist_col2:
+        month_order = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
         year = datetime.today().year
         hist_sales_y = hotmart.loc[(hotmart['status'].isin(['APPROVED', 'COMPLETE']))
                                  & (hotmart['approved_date'].dt.year == year)
@@ -291,6 +293,7 @@ with email_hist_exp:
         
         hist_sales_y['month'] = hist_sales_y['approved_date'].dt.month_name()
         hist_sales_y = hist_sales_y[['month', 'transaction']].groupby(by='month').count().reset_index()
+
         
         tmp_contacts = active_contacts[['cdate','id', 'tag']].copy()
         tmp_contacts = tmp_contacts.loc[(tmp_contacts['cdate'].dt.year == datetime.today().year)
@@ -305,13 +308,13 @@ with email_hist_exp:
         hist_email_sessions['month'] = hist_email_sessions['event_date'].dt.month_name()
         hist_email_sessions_y = hist_email_sessions[['month', 'event_name']].groupby(by='month').count().reset_index()   
 
-        fig_hist_sales_y = px.bar(data_frame=hist_sales_y, y='month', x='transaction', title='Cumulativo mensal de vendas de email marketing', text='transaction')#.update_layout(yaxis_range=[0, hist_sales['transaction'].max() + 5], yaxis_title='Número de vendas', xaxis_title='Data')
+        fig_hist_sales_y = px.bar(data_frame=hist_sales_y, y='month', x='transaction', title='Cumulativo mensal de vendas de email marketing', text='transaction', category_orders={'month': month_order})#.update_layout(yaxis_range=[0, hist_sales['transaction'].max() + 5], yaxis_title='Número de vendas', xaxis_title='Data')
         st.plotly_chart(fig_hist_sales_y, use_container_width=True)   
 
-        fig_hist_leads = px.bar(data_frame=hist_leads_y, x='id', y='month', title='Cumulativo mensal de novos leads', text='id')
+        fig_hist_leads = px.bar(data_frame=hist_leads_y, x='id', y='month', title='Cumulativo mensal de novos leads', text='id', category_orders={'month': month_order})
         st.plotly_chart(fig_hist_leads, use_container_width=True)
 
-        fig_hist_sessions = px.bar(data_frame=hist_email_sessions_y, y='month', x='event_name', title='Cumulativo mensal de novas sessões oriundas do email', text='event_name')
+        fig_hist_sessions = px.bar(data_frame=hist_email_sessions_y, y='month', x='event_name', title='Cumulativo mensal de novas sessões oriundas do email', text='event_name',category_orders={'month': month_order})
         st.plotly_chart(fig_hist_sessions, use_container_width=True)
 
         st.subheader('Evolução')
