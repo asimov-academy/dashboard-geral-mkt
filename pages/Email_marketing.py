@@ -163,12 +163,12 @@ limited_ga4_benchmark = ga4.loc[(ga4['event_date'].dt.date >= dates_benchmark_ac
 if ((len(limited_ga4) == 0) | (len(limited_active_benchmark) == 0)):
      st.warning(f'"🚨" dados do GA4 indisponíveis para o periodo selecionado período disponível {ga4["event_date"].max()} - {ga4["event_date"].min()}')
 
-limited_hotmart = hotmart.loc[(hotmart['order_date'].dt.date >= date_range[0]) & 
-                                (hotmart['order_date'].dt.date <= date_range[1]) & 
+limited_hotmart = hotmart.loc[(hotmart['order_date'] >= date_range[0]) & 
+                                (hotmart['order_date'] <= date_range[1]) & 
                                 (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
 
-limited_hotmart_benchmark = hotmart.loc[(hotmart['order_date'].dt.date >= dates_benchmark_active[0]) & 
-                        (hotmart['order_date'].dt.date <= dates_benchmark_active[1]) & 
+limited_hotmart_benchmark = hotmart.loc[(hotmart['order_date'] >= dates_benchmark_active[0]) & 
+                        (hotmart['order_date'] <= dates_benchmark_active[1]) & 
                         (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
 if ((len(limited_hotmart) == 0) | (len(limited_hotmart_benchmark) == 0)):
      st.warning(f'"🚨" dados da Hotmart indisponíveis para o periodo selecionado período disponível {hotmart["order_date"].max()} - {hotmart["order_date"].min()}')
@@ -225,11 +225,11 @@ with email_hist_exp:
         if option == 'Não':
             month = datetime.today().month       
             hist_sales = hotmart.loc[(hotmart['status'].isin(['APPROVED', 'COMPLETE']))
-                        & (hotmart['approved_date'].dt.month == month)
-                        & (hotmart['approved_date'].dt.year == datetime.today().year)
+                        & (pd.to_datetime(hotmart['order_date']).dt.month == month)
+                        & (pd.to_datetime(hotmart['order_date']).dt.year == datetime.today().year)
                         & ((hotmart['tracking.source_sck'].str.contains(pat='email') | (hotmart['tracking.source'].str.contains(pat='email')))), 
-                        ['approved_date', 'transaction']].copy()
-            hist_sales['date'] = hist_sales['approved_date'].dt.date
+                        ['order_date', 'transaction']].copy()
+            hist_sales['date'] = hist_sales['order_date']
             hist_sales = hist_sales[['date', 'transaction']].groupby(by='date').count().reset_index()
             
 
@@ -251,11 +251,11 @@ with email_hist_exp:
         else:
             hist_dates = st.date_input(label='Selecione o periodo desejado', value=[active_campaign['last_date'].max()-timedelta(days=6), active_campaign['last_date'].max()], max_value=active_campaign['last_date'].max(), min_value=active_campaign['last_date'].min())
             hist_sales = hotmart.loc[(hotmart['status'].isin(['APPROVED', 'COMPLETE']))
-            & (hotmart['approved_date'].dt.date >= hist_dates[0])
-            & (hotmart['approved_date'].dt.date <= hist_dates[1])
+            & (pd.to_datetime(hotmart['order_date']).dt.date >= hist_dates[0])
+            & (pd.hotmart(hotmart['order_date']).dt.date <= hist_dates[1])
             & ((hotmart['tracking.source_sck'].str.contains(pat='email') | (hotmart['tracking.source'].str.contains(pat='email')))), 
-            ['approved_date', 'transaction']].copy()
-            hist_sales['date'] = hist_sales['approved_date'].dt.date
+            ['order_date', 'transaction']].copy()
+            hist_sales['date'] = hist_sales['order_date']
             hist_sales = hist_sales[['date', 'transaction']].groupby(by='date').count().reset_index()
 
             tmp_contacts = active_contacts[['cdate','id', 'tag']].copy()
@@ -287,11 +287,11 @@ with email_hist_exp:
         month_order = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
         year = datetime.today().year
         hist_sales_y = hotmart.loc[(hotmart['status'].isin(['APPROVED', 'COMPLETE']))
-                                 & (hotmart['approved_date'].dt.year == year)
+                                 & (pd.to_datetime(hotmart['order_date']).dt.year == year)
                                  & ((hotmart['tracking.source_sck'].str.contains(pat='email') | (hotmart['tracking.source'].str.contains(pat='email')))), 
-                                ['approved_date', 'transaction']].copy()
+                                ['order_date', 'transaction']].copy()
         
-        hist_sales_y['month'] = hist_sales_y['approved_date'].dt.month_name()
+        hist_sales_y['month'] = pd.to_datetime(hist_sales_y['order_date']).dt.month_name()
         hist_sales_y = hist_sales_y[['month', 'transaction']].groupby(by='month').count().reset_index()
 
         
