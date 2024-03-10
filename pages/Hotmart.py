@@ -68,12 +68,12 @@ if st.session_state["authentication_status"]:
     
     date_range = st.sidebar.date_input("Periodo atual", value=(pd.to_datetime(hotmart['order_date']).max()-timedelta(days=6), pd.to_datetime(hotmart['order_date']).max()), max_value=pd.to_datetime(hotmart['order_date']).max(), min_value=pd.to_datetime(hotmart['order_date']).min(), key='hotmart_dates')
     dates_benchmark_hotmart = st.date_input("Periodo de para comparação", value=(pd.to_datetime(hotmart['order_date']).max()-timedelta(days=13), pd.to_datetime(hotmart['order_date']).max()-timedelta(days=7)), max_value=pd.to_datetime(hotmart['order_date']).max(), min_value=pd.to_datetime(hotmart['order_date']).min(), key='hotmart_dates_benchmark')
-    limited_hotmart = hotmart.loc[(hotmart['order_date'].dt.date >= date_range[0]) & 
-                                  (hotmart['order_date'].dt.date <= date_range[1]) & 
+    limited_hotmart = hotmart.loc[(hotmart['order_date'] >= date_range[0]) & 
+                                  (hotmart['order_date'] <= date_range[1]) & 
                                   (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
     
-    benchmark = hotmart.loc[(hotmart['order_date'].dt.date >= dates_benchmark_hotmart[0]) & 
-                            (hotmart['order_date'].dt.date <= dates_benchmark_hotmart[1]) & 
+    benchmark = hotmart.loc[(hotmart['order_date'] >= dates_benchmark_hotmart[0]) & 
+                            (hotmart['order_date'] <= dates_benchmark_hotmart[1]) & 
                             (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
 
     limited_fb = fb.loc[(fb['date'] >= date_range[0]) & (fb['date'] <= date_range[1])]
