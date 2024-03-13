@@ -163,12 +163,12 @@ limited_ga4_benchmark = ga4.loc[(ga4['event_date'].dt.date >= dates_benchmark_ac
 if ((len(limited_ga4) == 0) | (len(limited_active_benchmark) == 0)):
      st.warning(f'"🚨" dados do GA4 indisponíveis para o periodo selecionado período disponível {ga4["event_date"].max()} - {ga4["event_date"].min()}')
 
-limited_hotmart = hotmart.loc[(hotmart['order_date'] >= date_range[0]) & 
-                                (hotmart['order_date'] <= date_range[1]) & 
+limited_hotmart = hotmart.loc[(hotmart['order_date'].dt.date >= date_range[0]) & 
+                                (hotmart['order_date'].dt.date <= date_range[1]) & 
                                 (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
 
-limited_hotmart_benchmark = hotmart.loc[(hotmart['order_date'] >= dates_benchmark_active[0]) & 
-                        (hotmart['order_date'] <= dates_benchmark_active[1]) & 
+limited_hotmart_benchmark = hotmart.loc[(hotmart['order_date'].dt.date >= dates_benchmark_active[0]) & 
+                        (hotmart['order_date'].dt.date <= dates_benchmark_active[1]) & 
                         (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
 if ((len(limited_hotmart) == 0) | (len(limited_hotmart_benchmark) == 0)):
      st.warning(f'"🚨" dados da Hotmart indisponíveis para o periodo selecionado período disponível {hotmart["order_date"].max()} - {hotmart["order_date"].min()}')

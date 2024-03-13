@@ -26,6 +26,7 @@ except:
     raw_hotmart['tracking.source_sck'] = raw_hotmart['tracking.source_sck'].fillna(value='Desconhecido')
     raw_hotmart['tracking.source'] = raw_hotmart['tracking.source'].fillna(value='Desconhecido')
     raw_hotmart['approved_date'] = pd.to_datetime(raw_hotmart['approved_date'])
+    raw_hotmart['order_date'] = pd.to_datetime(raw_hotmart['order_date'])
     st.session_state['hotmart_data'] = raw_hotmart
     hotmart = st.session_state['hotmart_data'] = raw_hotmart
 
@@ -85,7 +86,7 @@ if st.session_state["authentication_status"]:
     date_range = st.sidebar.date_input("Periodo atual", value=(pd.to_datetime(valid_hotmart['order_date']).max()-timedelta(days=6), pd.to_datetime(valid_hotmart['order_date']).max()), max_value=pd.to_datetime(valid_hotmart['order_date']).max(), min_value=pd.to_datetime(valid_hotmart['order_date']).min())
 
     limited_sales = sales_journeys.loc[(sales_journeys['order_date'].dt.date >= date_range[0]) & (sales_journeys['order_date'].dt.date <= date_range[1])].copy()
-    limited_hotmart = valid_hotmart.loc[(valid_hotmart['order_date'] >= date_range[0]) & (valid_hotmart['order_date'] <= date_range[1])]
+    limited_hotmart = valid_hotmart.loc[(valid_hotmart['order_date'].dt.date >= date_range[0]) & (valid_hotmart['order_date'].dt.date <= date_range[1])]
     
 
     revenue_by_source = get_revenue_by_source(user_journey_with_revenue=limited_sales) 

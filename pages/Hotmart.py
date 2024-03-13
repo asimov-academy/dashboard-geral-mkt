@@ -17,7 +17,7 @@ def get_metrics(df: pd.DataFrame, fb_data: pd.DataFrame, date_range:list) -> dic
     valid_df = df.loc[df['status'].isin(['APPROVED', 'COMPLETE'])]
     metrics['billing'] = valid_df.loc[valid_df['source'] == 'PRODUCER', 'commission.value'].sum()
     metrics['n_valid_sales'] = valid_df.loc[(valid_df['source'] == 'PRODUCER'), 'transaction'].nunique()
-    metrics['refunds'] = len(df.loc[(df['status'] == 'REFUNDED') & (df['approved_date'] >= date_range[0]) & (df['approved_date'] <= date_range[1]), 'transaction'].unique())
+    metrics['refunds'] = len(df.loc[(df['status'] == 'REFUNDED') & (df['approved_date'].dt.date >= date_range[0]) & (df['approved_date'].dt.date <= date_range[1]), 'transaction'].unique())
     metrics['avarage_ticket'] = metrics['billing'] / metrics['n_valid_sales']
     metrics['affiliates_sales'] = len(valid_df.loc[(valid_df['source'] == 'AFFILIATE'), 'transaction'])
     transactions_by_affiliates = valid_df.loc[valid_df['source'] == 'AFFILIATE', 'transaction']
@@ -53,8 +53,10 @@ if st.session_state["authentication_status"]:
         tmp_hotmart = get_data_from_bucket(bucket_name='dashboard_marketing_processed', file_name='processed_hotmart.parquet', file_type='.parquet')
         raw_hotmart = pd.read_parquet(BytesIO(tmp_hotmart), engine='pyarrow')
         raw_hotmart['count'] = 1
+        raw_hotmart['order_date'] = pd.to_datetime(raw_hotmart['order_date'])
         raw_hotmart['tracking.source_sck'] = raw_hotmart['tracking.source_sck'].fillna(value='Desconhecido')
         raw_hotmart['tracking.source'] = raw_hotmart['tracking.source'].fillna(value='Desconhecido')
+        raw_hotmart['approved_date'] = pd.to_datetime(raw_hotmart['approved_date'])
         st.session_state['hotmart_data'] = raw_hotmart
         hotmart = st.session_state['hotmart_data'] = raw_hotmart
     try:
@@ -68,12 +70,12 @@ if st.session_state["authentication_status"]:
     
     date_range = st.sidebar.date_input("Periodo atual", value=(pd.to_datetime(hotmart['order_date']).max()-timedelta(days=6), pd.to_datetime(hotmart['order_date']).max()), max_value=pd.to_datetime(hotmart['order_date']).max(), min_value=pd.to_datetime(hotmart['order_date']).min(), key='hotmart_dates')
     dates_benchmark_hotmart = st.date_input("Periodo de para comparação", value=(pd.to_datetime(hotmart['order_date']).max()-timedelta(days=13), pd.to_datetime(hotmart['order_date']).max()-timedelta(days=7)), max_value=pd.to_datetime(hotmart['order_date']).max(), min_value=pd.to_datetime(hotmart['order_date']).min(), key='hotmart_dates_benchmark')
-    limited_hotmart = hotmart.loc[(hotmart['order_date'] >= date_range[0]) & 
-                                  (hotmart['order_date'] <= date_range[1]) & 
+    limited_hotmart = hotmart.loc[(hotmart['order_date'].dt.date >= date_range[0]) & 
+                                  (hotmart['order_date'].dt.date <= date_range[1]) & 
                                   (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
     
-    benchmark = hotmart.loc[(hotmart['order_date'] >= dates_benchmark_hotmart[0]) & 
-                            (hotmart['order_date'] <= dates_benchmark_hotmart[1]) & 
+    benchmark = hotmart.loc[(hotmart['order_date'].dt.date >= dates_benchmark_hotmart[0]) & 
+                            (hotmart['order_date'].dt.date <= dates_benchmark_hotmart[1]) & 
                             (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
 
     limited_fb = fb.loc[(fb['date'] >= date_range[0]) & (fb['date'] <= date_range[1])]
@@ -84,7 +86,7 @@ if st.session_state["authentication_status"]:
     options = {'Faturamento' : 'commission.value',
                'Vendas' : 'count'}
     ################ INICIO #########################################################   
-    st.write(hotmart.loc[(hotmart['status'] == 'REFUNDED') &(hotmart['order_date'] > pd.to_datetime('2024-02-29').date()), ['transaction', 'approved_date', 'order_date']])
+
     col_1, col_2, col_3 = st.columns(3)
     with col_1:
         st.metric('Faturamento', value = f'R$ {millify(current_metrics["billing"], precision=1)}', delta = millify(current_metrics['billing'] - benchmark_metrics['billing'], precision=1))

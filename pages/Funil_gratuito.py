@@ -31,6 +31,8 @@ except:
     tmp_hotmart = get_data_from_bucket(bucket_name='dashboard_marketing_processed', file_name='processed_hotmart.parquet', file_type='.parquet')
     raw_hotmart = pd.read_parquet(BytesIO(tmp_hotmart), engine='pyarrow')
     raw_hotmart['count'] = 1
+    raw_hotmart['order_date'] = pd.to_datetime(raw_hotmart['order_date'])
+    raw_hotmart['approved_date'] = pd.to_datetime(raw_hotmart['approved_date'])
     raw_hotmart['tracking.source_sck'] = raw_hotmart['tracking.source_sck'].fillna(value='Desconhecido')
     raw_hotmart['tracking.source'] = raw_hotmart['tracking.source'].fillna(value='Desconhecido')
     st.session_state['hotmart_data'] = raw_hotmart
