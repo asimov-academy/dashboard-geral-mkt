@@ -16,7 +16,7 @@ def get_metrics(df: pd.DataFrame, fb_data: pd.DataFrame, date_range:list) -> dic
     metrics = dict()
     valid_df = df.loc[df['status'].isin(['APPROVED', 'COMPLETE'])]
     metrics['billing'] = valid_df.loc[valid_df['source'] == 'PRODUCER', 'commission.value'].sum()
-    metrics['n_valid_sales'] = len(valid_df['transaction'].unique())
+    metrics['n_valid_sales'] = valid_df.loc[(valid_df['source'] == 'PRODUCER'), 'transaction'].nunique()
     metrics['refunds'] = len(df.loc[(df['status'] == 'REFUNDED') & (df['approved_date'] >= date_range[0]) & (df['approved_date'] <= date_range[1]), 'transaction'].unique())
     metrics['avarage_ticket'] = metrics['billing'] / metrics['n_valid_sales']
     metrics['affiliates_sales'] = len(valid_df.loc[(valid_df['source'] == 'AFFILIATE'), 'transaction'])
@@ -84,6 +84,7 @@ if st.session_state["authentication_status"]:
     options = {'Faturamento' : 'commission.value',
                'Vendas' : 'count'}
     ################ INICIO #########################################################   
+    st.write(hotmart.loc[(hotmart['status'] == 'REFUNDED') &(hotmart['order_date'] > pd.to_datetime('2024-02-29').date()), ['transaction', 'approved_date', 'order_date']])
     col_1, col_2, col_3 = st.columns(3)
     with col_1:
         st.metric('Faturamento', value = f'R$ {millify(current_metrics["billing"], precision=1)}', delta = millify(current_metrics['billing'] - benchmark_metrics['billing'], precision=1))
