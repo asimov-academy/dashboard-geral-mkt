@@ -184,7 +184,6 @@ benchmark_active_metrics = get_new_leads(active_contacts_df=limited_contacts_ben
 email_marketing_target_value = 50000
 ##################### OVERVIEW ####################
 overview = st.expander(label='Visão Geral')
-st.write(limited_hotmart['transaction'].unique())
 
 with overview:
     col_1, col_2, col_3, col_4 = st.columns(4)
