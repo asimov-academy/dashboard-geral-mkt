@@ -116,7 +116,6 @@ except:
     active_tags = pd.read_feather(BytesIO(tmp_tag))
     active_tags['contact'] = active_tags['contact'].astype(int)
     active_tags['tag'] = active_tags['tag'].apply(lambda x: x.astype(int))
-    st.write(active_tags)
     active_contacts = raw_contacts.merge(active_tags, left_on='id', right_on='contact', how='left')
     active_contacts.drop(['contact'], axis=1, inplace=True)
     st.session_state['active_campaign_contacts'] = active_contacts
