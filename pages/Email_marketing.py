@@ -87,8 +87,12 @@ def get_new_leads(active_contacts_df: pd.DataFrame, forbidden_tags: list) -> int
     """
     Get the number of new leads based on cdate in active_contacts_df and if these contacts doesn't have the forbidden TAGs 
     """
-    filtered_contacts = active_contacts_df.loc[~active_contacts_df['tag'].apply(lambda x: isinstance(x, np.ndarray) and any(tag in x for tag in forbidden_tags)), 'id'].nunique()
-    return filtered_contacts 
+    # Check if 'tag' column contains lists
+    valid_tags_mask = active_contacts_df['tag'].apply(lambda x: isinstance(x, list))
+
+    # Filter out rows with forbidden tags
+    #filtered_contacts = active_contacts_df.loc[valid_tags_mask & ~active_contacts_df['tag'].apply(lambda x: any(tag in x for tag in forbidden_tags)), 'id'].nunique()   
+    return 0
 
 
 
@@ -112,6 +116,7 @@ except:
     active_tags = pd.read_feather(BytesIO(tmp_tag))
     active_tags['contact'] = active_tags['contact'].astype(int)
     active_tags['tag'] = active_tags['tag'].apply(lambda x: x.astype(int))
+    st.write(active_tags)
     active_contacts = raw_contacts.merge(active_tags, left_on='id', right_on='contact', how='left')
     active_contacts.drop(['contact'], axis=1, inplace=True)
     st.session_state['active_campaign_contacts'] = active_contacts
@@ -150,7 +155,8 @@ limited_contacts_benchmark = active_contacts.loc[(active_contacts['cdate'].dt.da
 
 ############## HARDCODED PRE-SETS #################################################
 forbidden_tags = [172,214,246,252,258,264,270,276]
-
+active_contacts['size'] = active_contacts['tag'].apply(lambda x: len(x))
+st.write(active_contacts.loc[active_contacts['tag'].isna()])
 ##### OUTRAS FONTES #####
 limited_ga4 = ga4.loc[(ga4['event_date'].dt.date >= date_range[0]) & 
                       (ga4['event_date'].dt.date <= date_range[1]) &
