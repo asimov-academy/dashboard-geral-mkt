@@ -121,17 +121,17 @@ if st.session_state["authentication_status"]:
     if chart_option in(['Todas', 'Convencionadas', 'Simplificada']):
         st.plotly_chart(sources_fig, use_container_width=True)
 
-hist_exp = st.expander('Evolução histórica')
-with hist_exp:
-    option = st.radio(label='Usar datas diferentes do período selecionado', options=['Sim', 'Não'], index=1)
-    if option == 'Não':
-        daily_revenue_by_source = get_revenue_by_source_daily(user_journey_with_revenue=limited_sales)
-        fig = px.line(data_frame=daily_revenue_by_source, x='order_date', y='revenue_per_source', color='utm_source_wchannel', title='Evolução do faturamento ao longo do tempo')
-    
-    else:
-        new_dates = st.date_input("Selecione o periodo desejado", value=(sales_journeys['order_date'].min(), sales_journeys['order_date'].max()), max_value=sales_journeys['approved_date'].max(), min_value=sales_journeys['approved_date'].min())
-        tmp = sales_journeys.loc[(sales_journeys['order_date']>= new_dates[0]) & (sales_journeys['order_date'] <= new_dates[1])]   
-        daily_revenue_by_source = get_revenue_by_source_daily(tmp)            
-        fig = px.line(data_frame=daily_revenue_by_source, x='order_date', y='revenue_per_source', color='utm_source_wchannel', title='Evolução do faturamento ao longo do tempo')
+    hist_exp = st.expander('Evolução histórica')
+    with hist_exp:
+        option = st.radio(label='Usar datas diferentes do período selecionado', options=['Sim', 'Não'], index=1)
+        if option == 'Não':
+            daily_revenue_by_source = get_revenue_by_source_daily(user_journey_with_revenue=limited_sales)
+            fig = px.line(data_frame=daily_revenue_by_source, x='order_date', y='revenue_per_source', color='utm_source_wchannel', title='Evolução do faturamento ao longo do tempo')
+        
+        else:
+            new_dates = st.date_input("Selecione o periodo desejado", value=(sales_journeys['order_date'].min(), sales_journeys['order_date'].max()), max_value=sales_journeys['approved_date'].max(), min_value=sales_journeys['approved_date'].min())
+            tmp = sales_journeys.loc[(sales_journeys['order_date']>= new_dates[0]) & (sales_journeys['order_date'] <= new_dates[1])]   
+            daily_revenue_by_source = get_revenue_by_source_daily(tmp)            
+            fig = px.line(data_frame=daily_revenue_by_source, x='order_date', y='revenue_per_source', color='utm_source_wchannel', title='Evolução do faturamento ao longo do tempo')
 
-    st.plotly_chart(fig, use_container_width= True)
+        st.plotly_chart(fig, use_container_width= True)
