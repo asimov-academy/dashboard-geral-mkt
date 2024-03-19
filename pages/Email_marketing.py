@@ -155,7 +155,7 @@ limited_contacts_benchmark = active_contacts.loc[(active_contacts['cdate'].dt.da
 
 ############## HARDCODED PRE-SETS #################################################
 forbidden_tags = [172,214,246,252,258,264,270,276]
-st.write(active_campaign)
+
 ##### OUTRAS FONTES #####
 limited_ga4 = ga4.loc[(ga4['event_date'].dt.date >= date_range[0]) & 
                       (ga4['event_date'].dt.date <= date_range[1]) &
