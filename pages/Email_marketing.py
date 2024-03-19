@@ -155,8 +155,7 @@ limited_contacts_benchmark = active_contacts.loc[(active_contacts['cdate'].dt.da
 
 ############## HARDCODED PRE-SETS #################################################
 forbidden_tags = [172,214,246,252,258,264,270,276]
-active_contacts['size'] = active_contacts['tag'].apply(lambda x: len(x))
-st.write(active_contacts.loc[active_contacts['tag'].isna()])
+st.write(active_campaign)
 ##### OUTRAS FONTES #####
 limited_ga4 = ga4.loc[(ga4['event_date'].dt.date >= date_range[0]) & 
                       (ga4['event_date'].dt.date <= date_range[1]) &
@@ -323,5 +322,58 @@ with email_hist_exp:
         fig_hist_sessions = px.bar(data_frame=hist_email_sessions_y, y='month', x='event_name', title='Cumulativo mensal de novas sessões oriundas do email', text='event_name',category_orders={'month': month_order})
         st.plotly_chart(fig_hist_sessions, use_container_width=True)
 
-        st.subheader('Evolução')
+active_details_exp = st.expander('Detalhamento por e-mail/automação')
+
+with active_details_exp:
+    details_opt = st.radio(label='Selecione o tipo de detalhamento', options=['E-mail', 'Automação'], horizontal=True)
+    
+    if details_opt == 'E-mail':
+        email_opt = st.selectbox(label='Selecione o e-mail', options=active_campaign.loc[(active_campaign['send_amt'] > 0),'headline'].unique())
+        email_data = active_campaign.loc[(active_campaign['headline'] == email_opt) & (active_campaign['send_amt'] > 0)].copy()
+        email_data['open_rate'] = email_data['uniqueopens']/email_data['send_amt']
+        email_data['ctr'] = email_data['uniquelinkclicks']/email_data['send_amt']
+
+        st.subheader(f'Métricas para {email_opt}')
+        
+        inner_col1, inner_col2, inner_col3 = st.columns(3)
+        
+        with inner_col1:
+            st.metric(label='Total de envios', value=email_data['send_amt'])
+            st.metric(label='Número de cliques no link', value=email_data['uniquelinkclicks'])
+            st.metric(label='Número de aberturas do e-mail', value=email_data['uniqueopens'])
+
+        with inner_col2:
+            st.metric(label='Replies', value=email_data['replies'])
+            st.metric(label='Taxa de abertura', value=(email_data["open_rate"].astype(float) * 100).round(1))
+            st.metric(label='Taxa de cliques no link', value=(email_data["ctr"].astype(float) * 100).round(1))
+                
+        with inner_col3:
+            st.metric(label='Bounces', value=email_data['hardbounces'])
+            st.metric(label='Unsubscribes', value=email_data['unsubscribes'])
+
+    else:
+        auto_opt = st.selectbox(label='Selecione a automação', options=active_campaign.loc[active_campaign['automation_name'] != 'Sem automação', 'automation_name'].unique())
+        automation_data = active_campaign.loc[active_campaign['automation_name'] == auto_opt, ['automation_name', 'send_amt', 'uniquelinkclicks', 'uniqueopens', 'replies', 'hardbounces', 'unsubscribes']].groupby(by='automation_name').sum()
+        automation_data['open_rate'] = automation_data['uniqueopens']/automation_data['send_amt']
+        automation_data['ctr'] = automation_data['uniquelinkclicks']/automation_data['send_amt']
+        
+        inner_col1, inner_col2, inner_col3 = st.columns(3)
+        
+        with inner_col1:
+            st.metric(label='Total de envios', value=automation_data['send_amt'])
+            st.metric(label='Número de cliques no link', value=automation_data['uniquelinkclicks'])
+            st.metric(label='Número de aberturas do e-mail', value=automation_data['uniqueopens'])
+
+        with inner_col2:
+            st.metric(label='Replies', value=automation_data['replies'])
+            st.metric(label='Taxa de abertura', value=(automation_data["open_rate"].astype(float) * 100).round(1))
+            st.metric(label='Taxa de cliques no link', value=(automation_data["ctr"].astype(float) * 100).round(1))
+                
+        with inner_col3:
+            st.metric(label='Bounces', value=automation_data['hardbounces'])
+            st.metric(label='Unsubscribes', value=automation_data['unsubscribes'])
+
+
+
+    
         
