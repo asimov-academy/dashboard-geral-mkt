@@ -73,13 +73,13 @@ def get_email_revenue_sales(hotmart: pd.DataFrame) -> dict:
     hotmart_mail = {}
 
     if ((valid_df['tracking.source_sck'].str.contains(pat='email')) | valid_df['tracking.source'].str.contains(pat='email')).sum() > 0:
-        hotmart_mail['email_revenue'] = valid_df.loc[((valid_df['tracking.source_sck'].str.contains(pat='email')) | (valid_df['tracking.source'].str.contains(pat='email')))
+        hotmart_mail['email_revenue'] = valid_df.loc[((valid_df['tracking.source_sck'].split('_').apply(lambda x: x[0]).str.contains(pat='email')) | (valid_df['tracking.source'].str.contains(pat='email')))
                                                      & (valid_df['source'] == 'PRODUCER'), 'commission.value'].sum()
     else:
         hotmart_mail['email_revenue'] = 0
     
-    hotmart_mail['email_sales'] = len(valid_df.loc[(valid_df['tracking.source_sck'].str.contains(pat='email')) |(valid_df['tracking.source'].str.contains('email')), 'transaction'].unique())
-    hotmart_mail['cart_abandonment'] = valid_df.loc[valid_df['tracking.source_sck'].str.contains('email-abandono-carrinho'), 'transaction'].nunique()
+    hotmart_mail['email_sales'] = len(valid_df.loc[(valid_df['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).str.contains(pat='email')) |(valid_df['tracking.source'].str.contains('email')), 'transaction'].unique())
+    hotmart_mail['cart_abandonment'] = valid_df.loc[valid_df['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).str.contains('email-abandono-carrinho'), 'transaction'].nunique()
 
     return hotmart_mail
 
@@ -231,7 +231,7 @@ with email_hist_exp:
             hist_sales = hotmart.loc[(hotmart['status'].isin(['APPROVED', 'COMPLETE']))
                         & (pd.to_datetime(hotmart['order_date']).dt.month == month)
                         & (pd.to_datetime(hotmart['order_date']).dt.year == datetime.today().year)
-                        & ((hotmart['tracking.source_sck'].str.contains(pat='email') | (hotmart['tracking.source'].str.contains(pat='email')))), 
+                        & ((hotmart['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).str.contains(pat='email') | (hotmart['tracking.source'].str.contains(pat='email')))), 
                         ['order_date', 'transaction']].copy()
             hist_sales['date'] = hist_sales['order_date']
             hist_sales = hist_sales[['date', 'transaction']].groupby(by='date').count().reset_index()
@@ -257,7 +257,7 @@ with email_hist_exp:
             hist_sales = hotmart.loc[(hotmart['status'].isin(['APPROVED', 'COMPLETE']))
             & (pd.to_datetime(hotmart['order_date']).dt.date >= hist_dates[0])
             & (pd.hotmart(hotmart['order_date']).dt.date <= hist_dates[1])
-            & ((hotmart['tracking.source_sck'].str.contains(pat='email') | (hotmart['tracking.source'].str.contains(pat='email')))), 
+            & ((hotmart['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).str.contains(pat='email') | (hotmart['tracking.source'].str.contains(pat='email')))), 
             ['order_date', 'transaction']].copy()
             hist_sales['date'] = hist_sales['order_date']
             hist_sales = hist_sales[['date', 'transaction']].groupby(by='date').count().reset_index()
@@ -292,7 +292,7 @@ with email_hist_exp:
         year = datetime.today().year
         hist_sales_y = hotmart.loc[(hotmart['status'].isin(['APPROVED', 'COMPLETE']))
                                  & (pd.to_datetime(hotmart['order_date']).dt.year == year)
-                                 & ((hotmart['tracking.source_sck'].str.contains(pat='email') | (hotmart['tracking.source'].str.contains(pat='email')))), 
+                                 & ((hotmart['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).str.contains(pat='email') | (hotmart['tracking.source'].str.contains(pat='email')))), 
                                 ['order_date', 'transaction']].copy()
         
         hist_sales_y['month'] = pd.to_datetime(hist_sales_y['order_date']).dt.month_name()

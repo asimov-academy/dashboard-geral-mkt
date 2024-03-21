@@ -37,7 +37,7 @@ def get_custom_metrics(df: pd.DataFrame) -> pd.DataFrame:
         mock_df.sort_values(by='date', inplace=True)
         return mock_df
     
-def get_data_from_bucket(bucket_name: str, file_name: str, file_type: str = 'csv') -> bool:
+def get_data_from_bucket(bucket_name: str, file_name: str, file_type: str = 'csv') -> BytesIO:
     """Get file_name from google storage bucket (bucket_name)"""
     credentials = service_account.Credentials.from_service_account_info(st.secrets["GOOGLE_STORAGE"])
     client = storage.Client(credentials=credentials)

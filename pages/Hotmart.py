@@ -22,11 +22,11 @@ def get_metrics(df: pd.DataFrame, fb_data: pd.DataFrame, date_range:list) -> dic
     metrics['affiliates_sales'] = len(valid_df.loc[(valid_df['source'] == 'AFFILIATE'), 'transaction'])
     transactions_by_affiliates = valid_df.loc[valid_df['source'] == 'AFFILIATE', 'transaction']
     metrics['affiliates_revenue'] = valid_df.loc[(valid_df['transaction'].isin(transactions_by_affiliates)) & (valid_df['source'] == 'PRODUCER'), 'commission.value'].sum()
-    metrics['sales_team_sales'] = len(valid_df.loc[valid_df['tracking.source_sck'].str.contains('venda'), 'transaction'])
-    metrics['sales_team_revenue'] = valid_df.loc[valid_df['tracking.source_sck'].str.contains('venda'), 'commission.value'].sum()
+    metrics['sales_team_sales'] = len(valid_df.loc[valid_df['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).str.contains('venda'), 'transaction'])
+    metrics['sales_team_revenue'] = valid_df.loc[valid_df['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).str.contains('venda'), 'commission.value'].sum()
     metrics['profit'] = metrics['billing'] - fb_data['spend'].sum()
-    if ((valid_df['tracking.source_sck'].str.contains(pat='email')) | (valid_df['tracking.source'].str.contains(pat='email'))).sum() > 0:
-        metrics['email_revenue'] = valid_df.loc[((valid_df['tracking.source_sck'].str.contains(pat='email'))|
+    if ((valid_df['tracking.source_sck'].str.contains(pat='email')) | (valid_df['tracking.source'].str.split('_').apply(lambda x: x[0]).str.contains(pat='email'))).sum() > 0:
+        metrics['email_revenue'] = valid_df.loc[((valid_df['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).str.contains(pat='email'))|
                                                 (valid_df['tracking.source'].str.contains(pat='email'))) &
                                                 (valid_df['source'] == 'PRODUCER'), 'commission.value'].sum()
     else:

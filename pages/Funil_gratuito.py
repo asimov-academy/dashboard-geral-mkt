@@ -52,11 +52,11 @@ def get_funnel_metrics(df):
     metrics = {}
     metrics['revenue'] = df.loc[(df['status'].isin(['COMPLETE', 'APPROVED']))
                                 &(df['source'] == 'PRODUCER')
-                                &(df['tracking.source_sck'].isin(['basico', 'basico-expirou','seja-pro'])), 'commission.value'].sum()
+                                &(df['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).isin(['basico', 'basico-expirou','seja-pro'])), 'commission.value'].sum()
     metrics['n_sales'] = df.loc[(~df['commission.value'].isna())
                                 &(df['status'].isin(['COMPLETE', 'APPROVED']))
                                 &(df['source'] == 'PRODUCER')
-                                &(df['tracking.source_sck'].isin(['basico', 'basico-expirou','seja-pro']))].shape[0]
+                                &(df['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).isin(['basico', 'basico-expirou','seja-pro']))].shape[0]
     
     metrics['conversion_rate'] = metrics['n_sales'] / len(df['Email'].unique()) * 100
     
@@ -123,7 +123,7 @@ with col_3:
     sck_fig = px.pie(data_frame=limited_funnel.loc[(~limited_funnel['commission.value'].isna())
                                 &(limited_funnel['status'].isin(['COMPLETE', 'APPROVED']))
                                 &(limited_funnel['source'] == 'PRODUCER')
-                                &(limited_funnel['tracking.source_sck'].isin(['basico', 'basico-expirou','seja-pro']))], names='tracking.source_sck', values='commission.value', title='Vendas por SCK')
+                                &(limited_funnel['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).isin(['basico', 'basico-expirou','seja-pro']))], names='tracking.source_sck', values='commission.value', title='Vendas por SCK')
     st.plotly_chart(sck_fig)
 
 with col_4:
