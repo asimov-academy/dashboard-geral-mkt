@@ -73,7 +73,7 @@ def get_email_revenue_sales(hotmart: pd.DataFrame) -> dict:
     hotmart_mail = {}
 
     if ((valid_df['tracking.source_sck'].str.contains(pat='email')) | valid_df['tracking.source'].str.contains(pat='email')).sum() > 0:
-        hotmart_mail['email_revenue'] = valid_df.loc[((valid_df['tracking.source_sck'].split('_').apply(lambda x: x[0]).str.contains(pat='email')) | (valid_df['tracking.source'].str.contains(pat='email')))
+        hotmart_mail['email_revenue'] = valid_df.loc[((valid_df['tracking.source_sck'].str.split('_').apply(lambda x: x[0]).str.contains(pat='email')) | (valid_df['tracking.source'].str.contains(pat='email')))
                                                      & (valid_df['source'] == 'PRODUCER'), 'commission.value'].sum()
     else:
         hotmart_mail['email_revenue'] = 0
