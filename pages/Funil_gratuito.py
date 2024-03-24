@@ -43,11 +43,12 @@ try:
 except:
     st.session_state['sheets_hot_merged'] = sheets_data.merge(hotmart[['email', 'approved_date', 'status', 'tracking.source', 'tracking.source_sck', 'source', 'commission.value']], left_on='Email', right_on='email', how='left')
     tmp = st.session_state['sheets_hot_merged']
+    tmp['tracking.source_sck'] = tmp['tracking.source_sck'].fillna(value='Desconhecido')
     tmp['conversion_time'] = pd.to_datetime(tmp['approved_date']) - tmp['Data']
     tmp['conversion_time'] = tmp['conversion_time'].dt.days
     funnel_data = tmp.loc[tmp['conversion_time'] >= 0].copy()
 #########################################################################
-def get_funnel_metrics(df):
+def get_funnel_metrics(df) -> dict:
 
     metrics = {}
     metrics['revenue'] = df.loc[(df['status'].isin(['COMPLETE', 'APPROVED']))
