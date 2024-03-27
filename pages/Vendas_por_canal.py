@@ -14,7 +14,6 @@ try:
     sales_journeys = st.session_state['sales_journeys']
 except:
     sales_journeys = pd.read_parquet(BytesIO(get_data_from_bucket(bucket_name='dashboard_marketing_processed', file_name='sales_journeys.parquet', file_type='.csv')))
-    sales_journeys['order_date'] = sales_journeys['order_date'].apply(lambda x: x[0])
     st.session_state['sales_journeys'] = sales_journeys
 
 try:
@@ -36,7 +35,6 @@ def get_revenue_by_source(user_journey_with_revenue: pd.DataFrame) -> pd.DataFra
     Adds revenue by source to the DataFrame.
     """
     user_journey = user_journey_with_revenue.copy()
-    user_journey['commission.value'] = user_journey['commission.value'].apply(lambda x: x[0])
     user_journey['revenue_per_source'] = user_journey['commission.value'] / user_journey['utm_source_wchannel'].apply(len)
 
     revenue_by_source = {}
@@ -79,9 +77,9 @@ if st.session_state["authentication_status"]:
 
     valid_hotmart = hotmart.loc[hotmart['status'].isin(['APPROVED','COMPLETE'])]
     today = datetime.today()
-    date_range = st.sidebar.date_input("Periodo atual", value=(pd.to_datetime(valid_hotmart['order_date']).max()-timedelta(days=6), pd.to_datetime(valid_hotmart['order_date']).max()), max_value=pd.to_datetime(valid_hotmart['order_date']).max(), min_value=pd.to_datetime(valid_hotmart['order_date']).min())
+    date_range = st.sidebar.date_input("Periodo atual", value=(pd.to_datetime(sales_journeys['order_date']).max()-timedelta(days=1), pd.to_datetime(sales_journeys['order_date']).max()), max_value=pd.to_datetime(sales_journeys['order_date']).max(), min_value=pd.to_datetime(sales_journeys['order_date']).min())
 
-    limited_sales = sales_journeys.loc[(sales_journeys['order_date'] >= date_range[0]) & (sales_journeys['order_date'] <= date_range[1])].copy()
+    limited_sales = sales_journeys.loc[(sales_journeys['order_date'].dt.date >= date_range[0]) & (sales_journeys['order_date'].dt.date <= date_range[1])].copy()
     limited_hotmart = valid_hotmart.loc[(valid_hotmart['order_date'].dt.date >= date_range[0]) & (valid_hotmart['order_date'].dt.date <= date_range[1])]
     
 
@@ -110,7 +108,15 @@ if st.session_state["authentication_status"]:
                                                     'axis': {'range': [0, 100]}}
                                             ))
     st.plotly_chart(target_fig, use_container_width=True)
-       
+
+    col_1, col_2 = st.columns(2)
+    
+    with col_1:
+        st.metric(label='Total de vendas no periodo:', value=limited_sales['transaction'].nunique())
+    
+    with col_2:
+        st.metric(label='Total de vendas desconhecidas', value=limited_sales.loc[(limited_sales['utm_source_wchannel'].apply(lambda x: 'Desconhecido' in x)), 'transaction'].nunique())
+    
     chart_option = st.radio(label='Selecione o tipo de fontes consideradas', options=['Todas', 'Convencionadas', 'Simplificada'], horizontal=True, index=1)
     if chart_option == 'Todas':
         sources_fig = px.pie(data_frame=revenue_by_source, names='utm_source_wchannel', values='total_revenue', title='Distribuição do faturamento')

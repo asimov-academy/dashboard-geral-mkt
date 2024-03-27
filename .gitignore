@@ -4,4 +4,4 @@ token_fb.txt
 .vscode/
 pages/diagnostico.py
 pages/Ensino.py
-
+pages/Questionario_aluno.py
