@@ -77,7 +77,7 @@ if st.session_state["authentication_status"]:
 
     valid_hotmart = hotmart.loc[hotmart['status'].isin(['APPROVED','COMPLETE'])]
     today = datetime.today()
-    date_range = st.sidebar.date_input("Periodo atual", value=(pd.to_datetime(sales_journeys['order_date']).max()-timedelta(days=1), pd.to_datetime(sales_journeys['order_date']).max()), max_value=pd.to_datetime(sales_journeys['order_date']).max(), min_value=pd.to_datetime(sales_journeys['order_date']).min())
+    date_range = st.sidebar.date_input("Periodo atual", value=(pd.to_datetime(sales_journeys['order_date']).min(), pd.to_datetime(sales_journeys['order_date']).max()), max_value=pd.to_datetime(sales_journeys['order_date']).max(), min_value=pd.to_datetime(sales_journeys['order_date']).min())
 
     limited_sales = sales_journeys.loc[(sales_journeys['order_date'].dt.date >= date_range[0]) & (sales_journeys['order_date'].dt.date <= date_range[1])].copy()
     limited_hotmart = valid_hotmart.loc[(valid_hotmart['order_date'].dt.date >= date_range[0]) & (valid_hotmart['order_date'].dt.date <= date_range[1])]
