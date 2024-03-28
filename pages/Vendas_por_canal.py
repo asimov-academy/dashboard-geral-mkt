@@ -110,7 +110,8 @@ if st.session_state["authentication_status"]:
     st.plotly_chart(target_fig, use_container_width=True)
 
     col_1, col_2 = st.columns(2)
-    
+    st.write(limited_sales)
+    st.write(limited_hotmart[['transaction', 'tracking.source_sck']])
     with col_1:
         st.metric(label='Total de vendas no periodo:', value=limited_sales['transaction'].nunique())
     

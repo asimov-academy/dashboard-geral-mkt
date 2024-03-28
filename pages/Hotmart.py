@@ -72,7 +72,8 @@ if st.session_state["authentication_status"]:
     dates_benchmark_hotmart = st.date_input("Periodo de para comparação", value=(pd.to_datetime(hotmart['order_date']).max()-timedelta(days=13), pd.to_datetime(hotmart['order_date']).max()-timedelta(days=7)), max_value=pd.to_datetime(hotmart['order_date']).max(), min_value=pd.to_datetime(hotmart['order_date']).min(), key='hotmart_dates_benchmark')
     limited_hotmart = hotmart.loc[(hotmart['order_date'].dt.date >= date_range[0]) & 
                                   (hotmart['order_date'].dt.date <= date_range[1]) & 
-                                  (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))] #desprezando compras canceladas
+                                  (hotmart['status'].isin(['APPROVED','REFUNDED','COMPLETE']))].copy() #desprezando compras canceladas
+    limited_hotmart['sck'] = limited_hotmart['tracking.source_sck'].apply(lambda x: x.split('_')[0])
     
     benchmark = hotmart.loc[(hotmart['order_date'].dt.date >= dates_benchmark_hotmart[0]) & 
                             (hotmart['order_date'].dt.date <= dates_benchmark_hotmart[1]) & 
@@ -107,7 +108,7 @@ if st.session_state["authentication_status"]:
         st.metric('Afiliados', value=current_metrics['affiliates_sales'], delta=current_metrics['affiliates_sales'] - benchmark_metrics['affiliates_sales'])
 
     ################## PLOT SCk ######################################
-    sck_figure = px.pie(data_frame=limited_hotmart.loc[(limited_hotmart['status'] != 'REFUNDED') & (limited_hotmart['source'] == 'PRODUCER')], values='count', names= 'tracking.source_sck', hole=0.5, 
+    sck_figure = px.pie(data_frame=limited_hotmart.loc[(limited_hotmart['status'] != 'REFUNDED') & (limited_hotmart['source'] == 'PRODUCER')], values='count', names= 'sck', hole=0.5, 
                         title='Distribuição das vendas por sck', height=600).update_traces(textinfo='percent+value')
     st.plotly_chart(sck_figure, use_container_width=True)
 
